@@ -1,0 +1,870 @@
+openapi: 3.1.0
+
+info:
+  title: Portail de réservation de rendez-vous API
+  description: |
+    Contrat API partagé entre les équipes Frontend, Backend et Tests.
+    Projet DevOps II - Groupe 1.
+  version: 1.0.0
+  contact:
+    name: Groupe 1
+
+servers:
+  - url: http://localhost:8080/api
+    description: Backend local
+  - url: http://localhost/api
+    description: Environnement Docker / Kubernetes via Nginx
+
+tags:
+  - name: Public Services
+    description: Consultation des services disponibles
+  - name: Public Slots
+    description: Consultation des créneaux
+  - name: Public Bookings
+    description: Création et gestion des réservations
+  - name: Admin Authentication
+    description: Authentification administrateur
+  - name: Admin Services
+    description: Gestion des services
+  - name: Admin Slots
+    description: Gestion des créneaux
+
+security:
+  - {}
+
+components:
+
+  securitySchemes:
+
+    AdminSession:
+      type: apiKey
+      in: cookie
+      name: SESSION
+      description: Session administrateur gérée par Spring Security.
+
+  parameters:
+
+    ServiceId:
+      name: serviceId
+      in: query
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    SlotId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    ServicePathId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    CsrfHeader:
+      name: X-XSRF-TOKEN
+      in: header
+      required: true
+      description: CSRF token required for state-changing admin requests.
+      schema:
+        type: string
+
+  responses:
+
+    BadRequest:
+      description: Requête invalide ou données incorrectes.
+
+    Unauthorized:
+      description: Authentification requise.
+
+    Forbidden:
+      description: Accès interdit ou protection CSRF invalide.
+
+    NotFound:
+      description: Ressource introuvable.
+
+    Conflict:
+      description: Créneau indisponible ou conflit métier.
+
+    TooManyRequests:
+      description: Limite de requêtes dépassée.
+
+    InternalServerError:
+      description: Erreur interne du serveur.
+  
+  schemas:
+
+    # ==========================================
+    # SERVICE DTOs
+    # ==========================================
+
+    ServiceResponse:
+      type: object
+      required:
+        - id
+        - name
+        - active
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: Consultation générale
+        description:
+          type:
+            - string 
+            - "null"
+          example: Consultation médicale
+        active:
+          type: boolean
+          example: true
+
+    ServiceCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 500
+
+    ServicePatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        description:
+          type: 
+            - string
+            - "null"
+          maxLength: 500
+        active:
+          type: boolean
+
+    # ==========================================
+    # SLOT DTOs
+    # ==========================================
+
+    PublicSlotResponse:
+      type: object
+      required:
+        - id
+        - serviceId
+        - serviceName
+        - date
+        - startTime
+        - endTime
+        - available
+      properties:
+        id:
+          type: integer
+          format: int64
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+        available:
+          type: boolean
+
+    AdminSlotResponse:
+      type: object
+      required:
+        - id
+        - serviceId
+        - serviceName
+        - date
+        - startTime
+        - endTime
+        - active
+        - booked
+      properties:
+        id:
+          type: integer
+          format: int64
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+        active:
+          type: boolean
+        booked:
+          type: boolean
+
+    SlotCreateRequest:
+      type: object
+      required:
+        - serviceId
+        - date
+        - startTime
+        - endTime
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+
+    SlotPatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+        active:
+          type: boolean
+
+    # ==========================================
+    # BOOKING DTOs
+    # ==========================================
+
+    BookingCreateRequest:
+      type: object
+      required:
+        - slotId
+        - fullName
+        - email
+      properties:
+        slotId:
+          type: integer
+          format: int64
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 254
+
+    BookingCreatedResponse:
+      type: object
+      required:
+        - bookingId
+        - confirmationCode
+        - status
+      properties:
+        bookingId:
+          type: integer
+          format: int64
+        confirmationCode:
+          type: string
+          description: Secret confirmation code displayed only once.
+        status:
+          type: string
+          enum:
+            - CONFIRMED
+        serviceName:
+          type: string
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+
+    BookingCodeRequest:
+      type: object
+      required:
+        - confirmationCode
+      properties:
+        confirmationCode:
+          type: string
+          minLength: 20
+          maxLength: 256
+          writeOnly: true
+
+    BookingResponse:
+      type: object
+      required:
+        - bookingId
+        - status
+        - serviceName
+        - date
+        - startTime
+        - endTime
+      properties:
+        bookingId:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+            - CONFIRMED
+            - CANCELLED
+        serviceName:
+          type: string
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+
+    # ==========================================
+    # ADMIN AUTHENTICATION DTOs
+    # ==========================================
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+        password:
+          type: string
+          format: password
+          writeOnly: true
+
+    LoginResponse:
+      type: object
+      required:
+        - authenticated
+        - username
+      properties:
+        authenticated:
+          type: boolean
+          example: true
+        username:
+          type: string
+
+    AdminMeResponse:
+      type: object
+      required:
+        - username
+        - role
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+          example: ROLE_ADMIN
+paths:
+
+  
+  # ==========================================
+  # PUBLIC SERVICES
+  # ==========================================
+
+  /services:
+    get:
+      tags:
+        - Public Services
+      summary: Get all active services
+      operationId: getPublicServices
+      responses:
+        "200":
+          description: List of available services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ==========================================
+  # PUBLIC SLOTS
+  # ==========================================
+
+  /slots:
+    get:
+      tags:
+        - Public Slots
+      summary: Get available slots for a service and date
+      operationId: getAvailableSlots
+      parameters:
+        - $ref: "#/components/parameters/ServiceId"
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-11-20"
+      responses:
+        "200":
+          description: Available slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicSlotResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /slots/{id}:
+    get:
+      tags:
+        - Public Slots
+      summary: Get slot details
+      operationId: getPublicSlotById
+      parameters:
+        - $ref: "#/components/parameters/SlotId"
+      responses:
+        "200":
+          description: Slot details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicSlotResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ==========================================
+  # PUBLIC BOOKINGS
+  # ==========================================
+
+  /bookings:
+    post:
+      tags:
+        - Public Bookings
+      summary: Create a booking
+      operationId: createBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingCreateRequest"
+      responses:
+        "201":
+          description: Booking successfully created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingCreatedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /bookings/lookup:
+    post:
+      tags:
+        - Public Bookings
+      summary: Find a booking using its confirmation code
+      operationId: lookupBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingCodeRequest"
+      responses:
+        "200":
+          description: Booking found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /bookings/cancel:
+    post:
+      tags:
+        - Public Bookings
+      summary: Cancel a booking using its confirmation code
+      operationId: cancelBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingCodeRequest"
+      responses:
+        "200":
+          description: Booking successfully cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  # ==========================================
+  # ADMIN AUTHENTICATION
+  # ==========================================
+
+  /admin/login:
+    post:
+      tags:
+        - Admin Authentication
+      summary: Authenticate administrator
+      operationId: adminLogin
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authentication successful
+          headers:
+          Set-Cookie:
+            description: |
+              May set the SESSION cookie and the XSRF-TOKEN cookie.
+              SESSION is HttpOnly.
+              XSRF-TOKEN is readable by the frontend to obtain
+              the value sent in the X-XSRF-TOKEN request header.
+            schema:
+              type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /admin/me:
+    get:
+      tags:
+        - Admin Authentication
+      summary: Get authenticated administrator
+      operationId: getCurrentAdmin
+      security:
+        - AdminSession: []
+      responses:
+        "200":
+          description: Current administrator information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/logout:
+    post:
+      tags:
+        - Admin Authentication
+      summary: Logout administrator
+      operationId: adminLogout
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      responses:
+        "204":
+          description: Successfully logged out
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ==========================================
+  # ADMIN SERVICES
+  # ==========================================
+
+  /admin/services:
+    get:
+      tags:
+        - Admin Services
+      summary: Get all services for administration
+      operationId: getAdminServices
+      security:
+        - AdminSession: []
+      responses:
+        "200":
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags:
+        - Admin Services
+      summary: Create a service
+      operationId: createService
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceCreateRequest"
+      responses:
+        "201":
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /admin/services/{id}:
+    get:
+      tags:
+        - Admin Services
+      summary: Get service details
+      operationId: getAdminServiceById
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/ServicePathId"
+      responses:
+        "200":
+          description: Service details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags:
+        - Admin Services
+      summary: Update service
+      operationId: updateService
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/ServicePathId"
+        - $ref: "#/components/parameters/CsrfHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServicePatchRequest"
+      responses:
+        "200":
+          description: Service updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ==========================================
+  # ADMIN SLOTS
+  # ==========================================
+
+  /admin/services/{serviceId}/slots:
+    get:
+      tags:
+        - Admin Slots
+      summary: Get slots of a service for a specific date
+      operationId: getAdminServiceSlots
+      security:
+        - AdminSession: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: List of service slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminSlotResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/slots/{id}:
+    get:
+      tags:
+        - Admin Slots
+      summary: Get slot details for administration
+      operationId: getAdminSlotById
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/SlotId"
+      responses:
+        "200":
+          description: Slot details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSlotResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags:
+        - Admin Slots
+      summary: Update slot
+      operationId: updateSlot
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/SlotId"
+        - $ref: "#/components/parameters/CsrfHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlotPatchRequest"
+      responses:
+        "200":
+          description: Slot updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSlotResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /admin/slots:
+    post:
+      tags:
+        - Admin Slots
+      summary: Create a slot
+      operationId: createSlot
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlotCreateRequest"
+      responses:
+        "201":
+          description: Slot created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSlotResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"

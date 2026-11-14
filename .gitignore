@@ -1,0 +1,53 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Node.js / Frontend
+node_modules/
+dist/
+.vite/
+coverage/
+npm-debug.log*
+
+# Java / Spring Boot
+target/
+*.class
+*.jar
+*.war
+.gradle/
+build/
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.iml
+
+# Operating systems
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Test reports
+test-results/
+playwright-report/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
